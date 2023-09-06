@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::LinkedList, time::Duration};
 
 use futures::{future, StreamExt};
 use pid::PID;
@@ -17,6 +17,9 @@ pub struct App {
     pub k_p: WriteOnce<f32>,
     pub k_i: WriteOnce<f32>,
     pub k_d: WriteOnce<f32>,
+
+    pub err_linear: WriteOnce<LinkedList<f64>>,
+    pub err_angular: WriteOnce<LinkedList<f64>>,
 }
 
 impl App {
@@ -84,6 +87,12 @@ impl App {
             node.spin_once(std::time::Duration::from_millis(100));
         });
 
+        let err_linear = WriteOnce::new(LinkedList::new());
+        let mut err_linear_w = err_linear.clone();
+
+        let err_angular = WriteOnce::new(LinkedList::new());
+        let mut err_angular_w = err_angular.clone();
+
         let mass = 5.0; // kg
         let motor_distance = 3.0; // meter
 
@@ -93,7 +102,16 @@ impl App {
                 let target_angular_speed = target.angular.z;
 
                 let err_linear = target_linear_speed - current.x;
+                err_linear_w.push_back(err_linear);
+
                 let err_angular = target_angular_speed - current.z;
+                err_angular_w.push_back(err_angular);
+
+                while err_linear_w.len() > 1000 {
+                    err_linear_w.pop_front();
+                    err_angular_w.pop_front();
+                }
+                println!("lens => {} - {}", err_linear_w.len(), err_angular_w.len());
 
                 let linear_correction = pid_linear.main(err_linear as f32, 0.05);
                 let angular_correction = pid_angular.main(err_angular as f32, 0.05);
@@ -118,7 +136,13 @@ impl App {
             }
         });
 
-        Ok(Self { k_p, k_i, k_d })
+        Ok(Self {
+            k_p,
+            k_i,
+            k_d,
+            err_linear,
+            err_angular,
+        })
     }
 }
 
