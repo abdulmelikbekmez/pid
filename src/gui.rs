@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{ops::RangeInclusive, time::Duration};
 
 use eframe::egui::{
     plot::{Legend, Plot, Points},
@@ -11,28 +11,32 @@ pub struct Gui {
     pub app: App,
 }
 
+impl App {
+    pub fn slider<'a>(
+        data: &'a mut f32,
+        range: RangeInclusive<f32>,
+        text: &'static str,
+    ) -> Slider<'a> {
+        Slider::new(data, range)
+            .text(text)
+            .orientation(eframe::egui::SliderOrientation::Vertical)
+            .trailing_fill(true)
+    }
+}
+
 impl eframe::App for Gui {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         CentralPanel::default().show(ctx, |ui| {
             eframe::egui::global_dark_light_mode_switch(ui);
             ui.horizontal(|ui| {
-                ui.add(
-                    Slider::new(self.app.k_p.tmp(), 0.0..=50.0)
-                        .text("P gain")
-                        .orientation(eframe::egui::SliderOrientation::Vertical),
-                );
-
-                ui.add(
-                    Slider::new(self.app.k_i.tmp(), 0.0..=50.0)
-                        .text("I gain")
-                        .orientation(eframe::egui::SliderOrientation::Vertical),
-                );
-
-                ui.add(
-                    Slider::new(self.app.k_d.tmp(), 0.0..=50.0)
-                        .text("D gain")
-                        .orientation(eframe::egui::SliderOrientation::Vertical),
-                );
+                ui.add(App::slider(self.app.k_p.as_mut(), 0.0..=50.0, "P gain"));
+                ui.add(App::slider(self.app.k_i.as_mut(), 0.0..=50.0, "I gain"));
+                ui.add(App::slider(self.app.k_d.as_mut(), 0.0..=50.0, "D gain"));
+                ui.add(App::slider(
+                    self.app.motor_gain.as_mut(),
+                    0.0..=10.0,
+                    "Motor  Gain",
+                ));
             });
 
             let plot = Plot::new("err_demo")
@@ -49,7 +53,10 @@ impl eframe::App for Gui {
                         .enumerate()
                         .map(|(index, &item)| [index as f64 / 100.0, item])
                         .collect::<Vec<_>>();
-                    let points = Points::new(points).name("Error Linear");
+                    let points = Points::new(points)
+                        .name("Error Linear")
+                        .stems(0.0)
+                        .radius(1.0);
                     ui.points(points)
                 }
 
@@ -62,7 +69,10 @@ impl eframe::App for Gui {
                         .enumerate()
                         .map(|(index, &item)| [index as f64 / 100.0, item])
                         .collect::<Vec<_>>();
-                    let points = Points::new(points).name("Error Angular");
+                    let points = Points::new(points)
+                        .name("Error Angular")
+                        .stems(0.0)
+                        .radius(1.0);
                     ui.points(points)
                 }
             });

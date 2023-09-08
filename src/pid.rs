@@ -1,4 +1,4 @@
-use crate::write_once::WriteOnce;
+use crate::write_once::{RPtr, RWPtr};
 
 pub struct PID {
     err: f32,
@@ -10,13 +10,13 @@ pub struct PID {
 
     max_output: f32,
 
-    pub k_p: WriteOnce<f32>,
-    pub k_i: WriteOnce<f32>,
-    pub k_d: WriteOnce<f32>,
+    pub k_p: RWPtr<f32, RPtr>,
+    pub k_i: RWPtr<f32, RPtr>,
+    pub k_d: RWPtr<f32, RPtr>,
 }
 
 impl PID {
-    pub fn new(k_p: WriteOnce<f32>, k_i: WriteOnce<f32>, k_d: WriteOnce<f32>) -> Self {
+    pub fn new(k_p: RWPtr<f32, RPtr>, k_i: RWPtr<f32, RPtr>, k_d: RWPtr<f32, RPtr>) -> Self {
         Self {
             k_p,
             k_d,
@@ -26,7 +26,7 @@ impl PID {
             err_integral: 0.0,
             err_derivative: 0.0,
             saturated: false,
-            max_output: 100.0,
+            max_output: 1.0,
         }
     }
     pub fn main(&mut self, error: f32, dt: f32) -> f32 {

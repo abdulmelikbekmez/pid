@@ -1,36 +1,61 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
 
-#[derive(Clone)]
-pub struct WriteOnce<T>(*mut T);
+pub trait RW {}
+pub struct RPtr;
+pub struct WPtr;
 
-unsafe impl<T> Send for WriteOnce<T> {}
-unsafe impl<T> Sync for WriteOnce<T> {}
+impl RW for RPtr {}
+impl RW for WPtr {}
 
-impl<T> WriteOnce<T> {
-    pub fn new(data: T) -> Self {
-        Self(Box::into_raw(Box::new(data)))
-    }
-
-    pub fn tmp(&self) -> &mut T {
-        unsafe { self.0.as_mut().unwrap() }
-    }
-
-    #[inline(always)]
-    pub fn update(&self, data: T) {
-        unsafe { *self.0 = data }
-    }
+pub struct RWPtr<T, K: RW> {
+    data: *mut T,
+    phantom: PhantomData<K>,
 }
 
-impl<T> Deref for WriteOnce<T> {
+pub fn new<T>(data: T) -> (RWPtr<T, RPtr>, RWPtr<T, WPtr>) {
+    let ptr = Box::into_raw(Box::new(data));
+    let read = RWPtr {
+        data: ptr,
+        phantom: PhantomData::<RPtr>,
+    };
+
+    let write = RWPtr {
+        data: ptr,
+        phantom: PhantomData::<WPtr>,
+    };
+    (read, write)
+}
+
+impl<T, K: RW> Deref for RWPtr<T, K> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { self.0.as_ref().unwrap() }
+        unsafe { self.data.as_ref().unwrap() }
     }
 }
 
-impl<T> DerefMut for WriteOnce<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.0.as_mut().unwrap() }
+impl<T> Clone for RWPtr<T, RPtr> {
+    fn clone(&self) -> Self {
+        RWPtr {
+            data: self.data,
+            phantom: PhantomData::<RPtr>,
+        }
     }
 }
+impl<T> DerefMut for RWPtr<T, WPtr> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.data.as_mut().unwrap() }
+    }
+}
+
+impl<T> AsMut<T> for RWPtr<T, WPtr> {
+    fn as_mut(&mut self) -> &mut T {
+        unsafe { self.data.as_mut().unwrap() }
+    }
+}
+
+unsafe impl<T, K: RW> Send for RWPtr<T, K> {}
+unsafe impl<T, K: RW> Sync for RWPtr<T, K> {}
